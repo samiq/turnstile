@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
@@ -14,6 +14,21 @@ namespace VirtualDreams.Turnstile
     /// </summary>
     public class Turnstile : ItemsControl
     {
+        public static readonly DependencyProperty IsSelectedProperty = DependencyProperty.RegisterAttached("IsSelected", typeof(bool), typeof(Turnstile), new PropertyMetadata(false));
+
+        public static void SetIsSelected(DependencyObject obj, bool propertyValue)
+        {
+            obj.SetValue(IsSelectedProperty, propertyValue);
+        }
+
+        public static bool GetIsSelected(DependencyObject obj)
+        {
+            return (bool)obj.GetValue(IsSelectedProperty);
+        }
+
+        // Using a DependencyProperty as the backing store for SpeedRatio.  This enables animation, styling, binding, etc...
+        public static readonly DependencyProperty SpeedRatioProperty = DependencyProperty.Register("SpeedRatio", typeof(double), typeof(Turnstile), new PropertyMetadata(1d));
+
         /// <summary>
         /// Stores the position of each element inside this ItemsControl associated to the element itself.
         /// </summary>
@@ -22,28 +37,67 @@ namespace VirtualDreams.Turnstile
         /// <summary>
         /// Used to add a randomness factor to the turnstile animation.
         /// </summary>
-        Random _random = new Random();
+        private static Random _random = new Random();
+        /// <summary>
+        /// Parent scrollviewer to support scrollable items collections correctly
+        /// </summary>
+        private ScrollViewer _scrollViewer;
+
 
         /// <summary>
-        /// Provides the behavior for the Arrange pass of Silverlight layout. Classes
-        /// can override this method to define their own Arrange pass behavior.
+        /// This field is used as a marker for first measureoverride pass to detect if control is in scrollviewer
         /// </summary>
-        /// <param name="finalSize">The final area within the parent that this object should use to arrange itself
-        /// and its children.</param>
-        /// <returns>The actual size that is used after the element is arranged in layout.</returns>
+        private bool _runScrollDetection = true;
+
+        /// <summary>
+        /// This event is raised when animation is completed (to continue navigation for example)
+        /// </summary>
+        public event EventHandler AnimationCompleted;
+
+        public double SpeedRatio
+        {
+            get { return (double)GetValue(SpeedRatioProperty); }
+            set { SetValue(SpeedRatioProperty, value); }
+        }
+
         protected override Size ArrangeOverride(Size finalSize)
         {
             var size = base.ArrangeOverride(finalSize);
+            foreach (var item in Items.Select(i => ItemContainerGenerator.ContainerFromItem(i)).Cast<FrameworkElement>())
+            {
+                item.Opacity = 1;
+                var planeProjection = (item.Projection as PlaneProjection);
+                planeProjection.RotationX = planeProjection.RotationY = planeProjection.RotationZ = 0;
+            }
+            return size;
+        }
 
+        private void CalculateElementPositions(Size size)
+        {
+            var height = size.Height;
             // At each arrange we recalculate the positions
             _positions = new Dictionary<FrameworkElement, Point>();
+
+            if (_runScrollDetection)
+            {
+                _runScrollDetection = false;
+                _scrollViewer = Parent as ScrollViewer;
+            }
+
+            Point transformPoint = new Point(0, 0);
+            if (_scrollViewer != null)
+            {
+                height = _scrollViewer.ViewportHeight;
+                transformPoint = new Point(0, -_scrollViewer.VerticalOffset);
+            }
+
             // Items have been measured, so they should have an ActualWidth if visible
             foreach (var item in Items.Select(i => ItemContainerGenerator.ContainerFromItem(i))
-                                        .OfType<FrameworkElement>()
-                                        .Where(el => el.ActualWidth > 0.0))
+                .OfType<FrameworkElement>()
+                .Where(el => el.ActualWidth > 0.0))
             {
                 // Gets the item's position in coordinates of the parent
-                var offset = item.TransformToVisual(this).Transform(new Point(0, 0));
+                var offset = item.TransformToVisual(this).Transform(transformPoint);
                 _positions.Add(item, offset);
 
                 var projection = item.Projection as PlaneProjection;
@@ -51,12 +105,11 @@ namespace VirtualDreams.Turnstile
                 // Set the center of rotation to the left edge of the ItemsControl
                 projection.CenterOfRotationX = -1 * offset.X / item.ActualWidth;
                 // Set the perspective so that the central point is the vertical midpoint
-                projection.LocalOffsetY = offset.Y - size.Height / 2;
+                projection.LocalOffsetY = offset.Y - height / 2;
 
                 // Counteract the translation effects of setting LocalOffsetY
                 (item.RenderTransform as TranslateTransform).Y = -1 * projection.LocalOffsetY;
             }
-            return size;
         }
 
         /// <summary>
@@ -97,16 +150,28 @@ namespace VirtualDreams.Turnstile
         /// <param name="duration">The duration of the animation for each tile</param>
         public void AnimateTiles(EnterMode mode, YDirection yDirection, ZDirection zDirection, TimeSpan duration)
         {
+            CalculateElementPositions(new Size(ActualHeight, ActualWidth));
             // If the control has not been rendered or it's empty, cancel the animation
             if (ActualWidth <= 0 || ActualHeight <= 0 || _positions == null || _positions.Count <= 0) return;
 
+            double startHeight = 0;
+            double endHeight = ActualHeight;
+            if (_scrollViewer != null)
+            {
+                startHeight = 0;
+                endHeight = _scrollViewer.ViewportHeight;
+            }
             // Get the visible tiles for the current configuration
             // Tiles that are partially visible are also counted
             var visibleTiles = _positions.Where(x => x.Value.X + x.Key.ActualWidth >= 0 && x.Value.X <= ActualWidth &&
-                                                     x.Value.Y + x.Key.ActualHeight >= 0 && x.Value.Y <= ActualHeight);
+                x.Value.Y + x.Key.ActualHeight >= startHeight
+                &&
+                x.Value.Y <= endHeight);
 
             // No visible tiles, do nothing
             if (visibleTiles.Count() <= 0) return;
+
+
 
             // The Y coordinate of the lowest element is useful 
             // when we animate from bottom to top
@@ -114,9 +179,16 @@ namespace VirtualDreams.Turnstile
 
             // Store the animations to group them in one Storyboard in the end
             var animations = new List<Timeline>();
-
+            var lastAnimations = new List<Timeline>();
             foreach (var tilePosition in visibleTiles)
             {
+                var currentTileAnimationDuration = duration;
+                bool isTileSelected = GetIsSelected(tilePosition.Key);
+                if (isTileSelected)
+                {
+                    currentTileAnimationDuration
+                        = currentTileAnimationDuration.Multiply(1.1d);
+                }
                 // To make syntax lighter
                 var tile = tilePosition.Key;
                 var position = tilePosition.Value;
@@ -156,27 +228,58 @@ namespace VirtualDreams.Turnstile
                 var easing = new QuadraticEase() { EasingMode = EasingMode.EaseInOut };
 
                 var rotationAnimation = new DoubleAnimation { From = rotationFrom, To = rotationTo, EasingFunction = easing };
-                rotationAnimation.Duration = duration;
-                rotationAnimation.BeginTime = duration.Multiply(GetBeginTimeFactor(position.X, relativeY, mode));
+                rotationAnimation.Duration = currentTileAnimationDuration;
+                if (isTileSelected)
+                {
+                    //animate tile as it's lower than all others (so it will be later even it's last in the list)
+                    rotationAnimation.BeginTime =
+                           currentTileAnimationDuration.Multiply(GetBeginTimeFactor(position.X, lowestY * 1.2d, mode));
+                }
+                else
+                {
+                    rotationAnimation.BeginTime =
+                        currentTileAnimationDuration.Multiply(GetBeginTimeFactor(position.X, relativeY, mode));
+                }
                 rotationAnimation.SetTargetAndProperty(projection, PlaneProjection.RotationYProperty);
 
                 var opacityAnimation = new DoubleAnimation { To = opacityTo, EasingFunction = easing };
                 // The opacity animation takes the last 60% of the rotation animation
-                opacityAnimation.Duration = duration.Multiply(0.6);
+                opacityAnimation.Duration = currentTileAnimationDuration.Multiply(0.6);
                 opacityAnimation.BeginTime = rotationAnimation.BeginTime;
                 if (mode == EnterMode.Exit)
-                    opacityAnimation.BeginTime += duration - opacityAnimation.Duration.TimeSpan;
+                    opacityAnimation.BeginTime += currentTileAnimationDuration - opacityAnimation.Duration.TimeSpan;
                 opacityAnimation.SetTargetAndProperty(tile, UIElement.OpacityProperty);
-
+                if (isTileSelected)
+                {
+                    //clear selection
+                    SetIsSelected(tilePosition.Key, false);
+                }
                 animations.Add(rotationAnimation);
                 animations.Add(opacityAnimation);
             }
+            animations.AddRange(lastAnimations);
 
             // Begin all animations
             var sb = new Storyboard();
             foreach (var a in animations)
+            {
                 sb.Children.Add(a);
+            }
+            sb.SpeedRatio = SpeedRatio;
+            sb.Completed += sb_Completed;
             sb.Begin();
+
+        }
+
+        /// <summary>
+        /// Raise AnimationCompleted event
+        /// </summary>
+        private void sb_Completed(object sender, EventArgs e)
+        {
+            if (AnimationCompleted != null)
+            {
+                AnimationCompleted(this, EventArgs.Empty);
+            }
         }
 
         /// <summary>
@@ -201,7 +304,9 @@ namespace VirtualDreams.Turnstile
             // The rightmost element must start first when exiting and last when entering
             var columnFactor = mode == EnterMode.Enter ? xFactor : -1 * xFactor;
 
-            return y * yFactor + x * columnFactor + _random.Next(-1, 1) * randomFactor;
+            var result = y * yFactor + x * columnFactor + _random.Next(-1, 1) * randomFactor;
+            return result;
         }
+
     }
 }
