@@ -9,6 +9,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AlexSorokoletov.EffectDemo"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AlexSorokoletov.TileClickEffect", "AlexSorokoletov.TileClickEffect\AlexSorokoletov.TileClickEffect.csproj", "{6156D151-23D9-46B6-B922-B645BB9AAE5B}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Cometoide.PhoneDemo", "Cometoide.PhoneDemo\Cometoide.PhoneDemo.csproj", "{252F4ED3-A041-456C-834F-738C99CE2517}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Cometoide.Turnstile", "Cometoide.Turnstile\Cometoide.Turnstile.csproj", "{9759DFCB-76F4-4044-8793-D5E37C15DEAA}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -31,6 +35,16 @@ Global
 		{6156D151-23D9-46B6-B922-B645BB9AAE5B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6156D151-23D9-46B6-B922-B645BB9AAE5B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{6156D151-23D9-46B6-B922-B645BB9AAE5B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{252F4ED3-A041-456C-834F-738C99CE2517}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{252F4ED3-A041-456C-834F-738C99CE2517}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{252F4ED3-A041-456C-834F-738C99CE2517}.Debug|Any CPU.Deploy.0 = Debug|Any CPU
+		{252F4ED3-A041-456C-834F-738C99CE2517}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{252F4ED3-A041-456C-834F-738C99CE2517}.Release|Any CPU.Build.0 = Release|Any CPU
+		{252F4ED3-A041-456C-834F-738C99CE2517}.Release|Any CPU.Deploy.0 = Release|Any CPU
+		{9759DFCB-76F4-4044-8793-D5E37C15DEAA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9759DFCB-76F4-4044-8793-D5E37C15DEAA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9759DFCB-76F4-4044-8793-D5E37C15DEAA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9759DFCB-76F4-4044-8793-D5E37C15DEAA}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
