@@ -48,11 +48,6 @@ namespace Cometoide.Turnstile
         private ScrollViewer _scrollViewer;
 
         /// <summary>
-        /// This field is used as a marker for first measureoverride pass to detect if control is in scrollviewer
-        /// </summary>
-        private bool _runScrollDetection = true;
-
-        /// <summary>
         /// This event is raised when animation is completed (to continue navigation)
         /// </summary>
         public event EventHandler AnimationCompleted;
@@ -76,23 +71,18 @@ namespace Cometoide.Turnstile
         /// Calculates element positions based to where they stand inside the control.
         /// </summary>
         private void CalculateElementPositions()
-        {
-            var height = ActualHeight;
-            var transformPoint = new Point(0, 0);
-
+        {   
             // At each arrange we recalculate the positions
             _positions = new Dictionary<FrameworkElement, Point>();
+            _scrollViewer = this.GetTemplateChild("ScrollViewer") as ScrollViewer;
 
-            if (_runScrollDetection)
-            {
-                _runScrollDetection = false;
-                _scrollViewer = this.GetTemplateChild("ScrollViewer") as ScrollViewer;
-            }
+            var height = _scrollViewer.ActualHeight;
+            var transformPoint = new Point(0, 0);
             
             if (_scrollViewer != null)
             {
                 height = _scrollViewer.ViewportHeight;
-                transformPoint = new Point(0, -_scrollViewer.VerticalOffset);
+                transformPoint = new Point(0,0);
             }
 
             // Items have been measured, so they should have an ActualWidth if visible
@@ -155,7 +145,6 @@ namespace Cometoide.Turnstile
         /// <param name="duration">The duration of the animation for each tile</param>
         public void AnimateTiles(EnterMode mode, YDirection yDirection, ZDirection zDirection, TimeSpan duration)
         {
-
             // If the control has not been rendered, cancel the animation
             if (ActualWidth <= 0 || ActualHeight <= 0) 
             {
@@ -173,21 +162,16 @@ namespace Cometoide.Turnstile
             double startHeight = 0;
             double endHeight = ActualHeight;
 
-            if (_scrollViewer != null)
-            {
-                startHeight = 0;
-                endHeight = _scrollViewer.ViewportHeight;
-            }
-
+            startHeight = 0;
+            endHeight = _scrollViewer.ViewportHeight;
+            
             // Get the visible tiles for the current configuration
             // Tiles that are partially visible are also counted
-            var visibleTiles = _positions.Where(x => x.Value.X + x.Key.ActualWidth >= 0 && 
-                x.Value.X <= ActualWidth &&
-                x.Value.Y + x.Key.ActualHeight >= startHeight &&
-                x.Value.Y <= endHeight);
+            var visibleTiles = _positions.Where(x => x.Value.Y + x.Key.ActualHeight >= startHeight && x.Value.Y <= startHeight + endHeight);
 
             // No visible tiles, do nothing
-            if (visibleTiles.Count() <= 0) 
+            var visibleCount = visibleTiles.Count();
+            if (visibleCount <= 0) 
             {
                 return;
             }
@@ -276,14 +260,15 @@ namespace Cometoide.Turnstile
 
             // Begin all animations
             var sb = new Storyboard();
+
             foreach (var a in animations)
             {
                 sb.Children.Add(a);
             }
+
             sb.SpeedRatio = SpeedRatio;
             sb.Completed += sb_Completed;
             sb.Begin();
-
         }
 
         /// <summary>
